@@ -25,6 +25,39 @@ trait PaginationTrait
     /** @var int[]  */
     protected static array $limit = [20, 30, 50, 100, 200];
 
+    protected function getCurrentFilterQuery(): string
+    {
+        return trim((string)$this->getRequest()->getParam('option_filter', ''));
+    }
+
+    protected function applyFilterToCollection(Collection $collection): Collection
+    {
+        $filterQuery = $this->getCurrentFilterQuery();
+
+        if ($filterQuery === '') {
+            return $collection;
+        }
+
+        $collection->getSelect()->where(
+            'sort_alpha_value.value LIKE ?',
+            '%' . addcslashes($filterQuery, '%_') . '%'
+        );
+
+        return $collection;
+    }
+
+    protected function getFilteredOptionCollection(AbstractAttribute $attribute): Collection
+    {
+        $collection = $this->_attrOptionCollectionFactory->create()->setAttributeFilter(
+            $attribute->getId()
+        )->setPositionOrder(
+            'asc',
+            true
+        );
+
+        return $this->applyFilterToCollection($collection);
+    }
+
     /**
      * Retrieve option values collection
      *
@@ -42,13 +75,8 @@ trait PaginationTrait
                 $attribute
             )->getAllOptions();
         } else {
-            return $this->_attrOptionCollectionFactory->create()->setAttributeFilter(
-                $attribute->getId()
-            )->setPositionOrder(
-                'asc',
-                true
-            )->setPageSize($this->getRequest()->getParam('limit') ?? static::$defaultLimit)
-                ->setCurPage($this->getRequest()->getParam('page') ?? static::$defaultPage)
+            return $this->getFilteredOptionCollection($attribute)->setPageSize($this->getCurrentPageSize())
+                ->setCurPage($this->getCurrentPageNumber())
                 ->load();
         }
     }
@@ -79,7 +107,7 @@ trait PaginationTrait
         if ($isSystemAttribute) {
             $values = $this->getPreparedValues($optionCollection, $isSystemAttribute, $inputType, $defaultValues);
         } else {
-            $optionCollection->setPageSize($this->getRequest()->getParam('limit'));
+            $optionCollection->setPageSize($this->getCurrentPageSize());
             $values = array_merge(
                 $values,
                 $this->getPreparedValues($optionCollection, $isSystemAttribute, $inputType, $defaultValues)
@@ -149,10 +177,9 @@ trait PaginationTrait
      */
     public function getCurrentPageNumber(): int
     {
-        if ($this->getRequest()->getParam('page')) {
-            return (int)$this->getRequest()->getParam('page');
-        }
-        return static::$defaultPage;
+        $page = (int)$this->getRequest()->getParam('page', static::$defaultPage);
+
+        return max(static::$defaultPage, min($page, $this->getMaxPageCount()));
     }
 
     /**
@@ -161,8 +188,9 @@ trait PaginationTrait
     public function getCurrentPageSize(): int
     {
         if ($this->getRequest()->getParam('limit')) {
-            return (int)$this->getRequest()->getParam('limit');
+            return max(1, (int)$this->getRequest()->getParam('limit'));
         }
+
         return static::$defaultLimit;
     }
 
@@ -180,11 +208,13 @@ trait PaginationTrait
     public function getMaxPageCount(): int
     {
         $attribute = $this->getAttributeObject();
-        return $this->_attrOptionCollectionFactory->create()->setAttributeFilter(
-            $attribute->getId()
-        )->setPageSize($this->getRequest()->getParam('limit') ?? static::$defaultLimit)
-            ->getLastPageNumber();
 
+        return max(
+            static::$defaultPage,
+            (int)$this->getFilteredOptionCollection($attribute)
+                ->setPageSize($this->getCurrentPageSize())
+                ->getLastPageNumber()
+        );
     }
 
     /**
@@ -199,4 +229,57 @@ trait PaginationTrait
         $requestParams['limit'] = $limit;
         return $this->getUrl('*/*/*', $requestParams);
     }
+
+    /**
+     * @return array<int, array<string, mixed>|mixed>
+     */
+    public function getOptionValuesData(): array
+    {
+        $values = [];
+
+        foreach ($this->getOptionValues() as $value) {
+            $value = $value->getData();
+            $values[] = is_array($value) ? array_map(static function ($str) {
+                return htmlspecialchars_decode($str, ENT_QUOTES);
+            }, $value) : $value;
+        }
+
+        return $values;
+    }
+
+    /**
+     * @return array<string, int|array<int, int>>
+     */
+    public function getPaginationData(): array
+    {
+        return [
+            'currentPage' => $this->getCurrentPageNumber(),
+            'pageSize' => $this->getCurrentPageSize(),
+            'maxPageCount' => $this->getMaxPageCount(),
+            'limits' => $this->getLimits(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getPagerRequestParams(): array
+    {
+        $requestParams = $this->getRequest()->getParams();
+
+        unset($requestParams['key'], $requestParams['isAjax'], $requestParams['panel']);
+
+        return $requestParams;
+    }
+
+    public function getPagerAjaxUrl(): string
+    {
+        return $this->getUrl('qoliber_attributeoptionpager/pager/options');
+    }
+
+    public function getCurrentFilterValue(): string
+    {
+        return $this->getCurrentFilterQuery();
+    }
+
 }

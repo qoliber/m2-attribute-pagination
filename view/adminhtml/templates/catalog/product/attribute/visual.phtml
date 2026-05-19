@@ -14,6 +14,7 @@
 /** @var $block \Qoliber\AttributeOptionPager\Block\Adminhtml\Attribute\Edit\Options\Text */
 
 $stores = $block->getStoresSortedBySortOrder();
+$pagination = $block->getPaginationData();
 ?>
 <fieldset class="admin__fieldset fieldset">
     <legend class="legend">
@@ -21,24 +22,36 @@ $stores = $block->getStoresSortedBySortOrder();
     </legend><br />
     <div class="admin__control-table-wrapper" id="swatch-visual-options-panel">
         <div class="admin__data-grid-pager-wrap attribute-pager">
+            <div class="attribute-pager-filter">
+                <label for="swatch-visual-options-filter" class="admin__control-support-text"><?= $block->escapeHtml(__('Filter options')) ?></label>
+                <input type="text"
+                       id="swatch-visual-options-filter"
+                       class="admin__control-text attribute-pager-filter-input"
+                       value="<?= $block->escapeHtmlAttr($block->getCurrentFilterValue()) ?>"
+                       placeholder="<?= $block->escapeHtmlAttr(__('Search option label')) ?>">
+                <button type="button" class="action-secondary attribute-pager-filter-btn">
+                    <span><?= $block->escapeHtml(__('Filter')) ?></span>
+                </button>
+                <button type="button" class="action-secondary attribute-pager-filter-clear-btn">
+                    <span><?= $block->escapeHtml(__('Clear')) ?></span>
+                </button>
+            </div>
             <label for="attributeGrid_page-limit"></label><select name="limit" id="attributeGrid_page-limit" class="admin__control-select attribute-pager-limit">
                 <?php foreach ($block->getLimits() as $limit): ?>
-                    <option value="<?= $limit;?>" <?= $block->getCurrentPageSize() === $limit ? 'selected="selected"' : '';?> data-url="<?= $block->getNextUrl($limit , $block->getCurrentPageNumber()); ?>"><?= $limit; ?></option>
+                    <option value="<?= $limit; ?>" <?= $pagination['pageSize'] === $limit ? 'selected="selected"' : ''; ?>><?= $limit; ?></option>
                 <?php endforeach; ?>
             </select>
             <label for="attributeGridattributeGrid_page-limit" class="admin__control-support-text"><?= __('per page'); ?></label>
 
             <div class="admin__data-grid-pager">
-                <button type="button" class="attribute-pager-btn action-previous <?= $block->getCurrentPageNumber() === 1 ? 'disabled' :
-                    '" data-url="' . $block->getNextUrl($block->getCurrentPageSize() , $block->getCurrentPageNumber() - 1); ?>">
+                <button type="button" class="attribute-pager-btn action-previous<?= $pagination['currentPage'] === 1 ? ' disabled' : '' ?>" data-page="<?= max(1, $pagination['currentPage'] - 1) ?>">
                     <span><?= __('Previous page'); ?></span>
                 </button>
-                <input type="number" id="attributeGrid_page-current" min="1" max="<?= $block->getMaxPageCount() ?>" name="page" value="<?= $block->getCurrentPageNumber(); ?>"
-                       data-url="<?= $block->getNextUrl($block->getCurrentPageSize() , 0) ?>" class="admin__control-text attribute-pager-current" data-ui-id="adminhtml-product-attribute-grid-current-page">
+                <input type="number" id="attributeGrid_page-current" min="1" max="<?= $pagination['maxPageCount'] ?>" name="page" value="<?= $pagination['currentPage']; ?>"
+                       class="admin__control-text attribute-pager-current" data-ui-id="adminhtml-product-attribute-grid-current-page">
                 <label class="admin__control-support-text" for="attributeGrid_page-current">
-                    <?= __('of');?> <span> <?= $block->getMaxPageCount(); ?> </span>                        </label>
-                <button type="button" class="attribute-pager-btn action-next <?= $block->getMaxPageCount() === $block->getCurrentPageNumber() ? ' disabled"' :
-                    '" data-url="' . $block->getNextUrl($block->getCurrentPageSize() , $block->getCurrentPageNumber() + 1); ?>">
+                    <?= __('of');?> <span class="attribute-pager-total-pages"><?= $pagination['maxPageCount']; ?></span></label>
+                <button type="button" class="attribute-pager-btn action-next<?= $pagination['maxPageCount'] === $pagination['currentPage'] ? ' disabled' : '' ?>" data-page="<?= min($pagination['maxPageCount'], $pagination['currentPage'] + 1) ?>">
                     <span><?= __('Next page'); ?></span>
                 </button>
             </div>
@@ -142,7 +155,14 @@ $stores = $block->getStoresSortedBySortOrder();
                     "message": "<?= $block->escapeHtml(__("The value of Admin must be unique.")) ?>"
                 },
                 "Qoliber_AttributeOptionPager/js/pager": {
-                    "ajaxUrlValue": {}
+                    "ajaxUrl": "<?= $block->escapeUrl($block->getPagerAjaxUrl()) ?>",
+                    "panelId": "swatch-visual-options-panel",
+                    "panelType": "visual",
+                    "containerSelector": "[data-role=swatch-visual-options-container]",
+                    "registryKey": "swatch-visual-options-panel",
+                    "filterSelector": ".attribute-pager-filter-input",
+                    "requestParams": <?= /* @noEscape */ json_encode($block->getPagerRequestParams(), JSON_HEX_QUOT) ?>,
+                    "pagination": <?= /* @noEscape */ json_encode($pagination, JSON_HEX_QUOT) ?>
                 }
             }
         }

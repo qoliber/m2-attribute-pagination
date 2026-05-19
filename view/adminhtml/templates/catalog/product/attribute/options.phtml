@@ -11,35 +11,60 @@ use Qoliber\AttributeOptionPager\Block\Adminhtml\Attribute\Edit\Options\Options;
 
 /** @var $block Options */
 $stores = $block->getStoresSortedBySortOrder();
+$pagination = $block->getPaginationData();
+$renderPager = static function (Options $block, string $suffix, string $extraClass = '', bool $showFilter = false): string {
+    $pagination = $block->getPaginationData();
+
+    ob_start();
+    ?>
+    <div class="admin__data-grid-pager-wrap attribute-pager<?= $extraClass ? ' ' . $block->escapeHtmlAttr($extraClass) : '' ?>">
+        <?php if ($showFilter): ?>
+            <div class="attribute-pager-filter">
+                <label for="attribute-options-filter" class="admin__control-support-text"><?= $block->escapeHtml(__('Filter options')) ?></label>
+                <input type="text"
+                       id="attribute-options-filter"
+                       class="admin__control-text attribute-pager-filter-input"
+                       value="<?= $block->escapeHtmlAttr($block->getCurrentFilterValue()) ?>"
+                       placeholder="<?= $block->escapeHtmlAttr(__('Search option label')) ?>">
+                <button type="button" class="action-secondary attribute-pager-filter-btn">
+                    <span><?= $block->escapeHtml(__('Filter')) ?></span>
+                </button>
+                <button type="button" class="action-secondary attribute-pager-filter-clear-btn">
+                    <span><?= $block->escapeHtml(__('Clear')) ?></span>
+                </button>
+            </div>
+        <?php endif; ?>
+        <label for="attributeGrid_page-limit-<?= $block->escapeHtmlAttr($suffix) ?>"></label><select name="limit" id="attributeGrid_page-limit-<?= $block->escapeHtmlAttr($suffix) ?>" class="admin__control-select attribute-pager-limit">
+            <?php foreach ($block->getLimits() as $limit): ?>
+                <option value="<?= $limit; ?>" <?= $pagination['pageSize'] === $limit ? 'selected="selected"' : ''; ?>><?= $limit; ?></option>
+            <?php endforeach; ?>
+        </select>
+        <label for="attributeGrid_page-limit-<?= $block->escapeHtmlAttr($suffix) ?>" class="admin__control-support-text"><?= __('per page'); ?></label>
+
+        <div class="admin__data-grid-pager">
+            <button type="button" class="attribute-pager-btn action-previous<?= $pagination['currentPage'] === 1 ? ' disabled' : '' ?>" data-page="<?= max(1, $pagination['currentPage'] - 1) ?>">
+                <span><?= __('Previous page'); ?></span>
+            </button>
+            <input type="number" id="attributeGrid_page-current-<?= $block->escapeHtmlAttr($suffix) ?>" min="1" max="<?= $pagination['maxPageCount'] ?>" name="page" value="<?= $pagination['currentPage']; ?>"
+                   class="admin__control-text attribute-pager-current" data-ui-id="adminhtml-product-attribute-grid-current-page">
+            <label class="admin__control-support-text" for="attributeGrid_page-current-<?= $block->escapeHtmlAttr($suffix) ?>">
+                <?= __('of'); ?> <span class="attribute-pager-total-pages"><?= $pagination['maxPageCount']; ?></span></label>
+            <button type="button" class="attribute-pager-btn action-next<?= $pagination['maxPageCount'] === $pagination['currentPage'] ? ' disabled' : '' ?>" data-page="<?= min($pagination['maxPageCount'], $pagination['currentPage'] + 1) ?>">
+                <span><?= __('Next page'); ?></span>
+            </button>
+        </div>
+    </div>
+    <?php
+
+    return trim(ob_get_clean());
+};
 ?>
 <fieldset class="admin__fieldset fieldset">
     <legend class="legend">
         <span><?= $block->escapeHtml(__('Manage Options (Values of Your Attribute)' )) ?></span>
     </legend><br />
     <div class="admin__control-table-wrapper" id="manage-options-panel" data-index="attribute_options_select_container">
-        <div class="admin__data-grid-pager-wrap attribute-pager">
-            <label for="attributeGrid_page-limit"></label><select name="limit" id="attributeGrid_page-limit" class="admin__control-select attribute-pager-limit">
-                <?php foreach ($block->getLimits() as $limit): ?>
-                    <option value="<?= $limit;?>" <?= $block->getCurrentPageSize() === $limit ? 'selected="selected"' : '';?> data-url="<?= $block->getNextUrl($limit , $block->getCurrentPageNumber()); ?>"><?= $limit; ?></option>
-                <?php endforeach; ?>
-            </select>
-            <label for="attributeGridattributeGrid_page-limit" class="admin__control-support-text"><?= __('per page'); ?></label>
-
-            <div class="admin__data-grid-pager">
-                <button type="button" class="attribute-pager-btn action-previous <?= $block->getCurrentPageNumber() === 1 ? 'disabled' :
-                    '" data-url="' . $block->getNextUrl($block->getCurrentPageSize() , $block->getCurrentPageNumber() - 1); ?>">
-                    <span><?= __('Previous page'); ?></span>
-                </button>
-                <input type="number" id="attributeGrid_page-current" min="1" max="<?= $block->getMaxPageCount() ?>" name="page" value="<?= $block->getCurrentPageNumber(); ?>"
-                       data-url="<?= $block->getNextUrl($block->getCurrentPageSize() , 0) ?>" class="admin__control-text attribute-pager-current" data-ui-id="adminhtml-product-attribute-grid-current-page">
-                <label class="admin__control-support-text" for="attributeGrid_page-current">
-                    <?= __('of');?> <span> <?= $block->getMaxPageCount(); ?> </span>                        </label>
-                <button type="button" class="attribute-pager-btn action-next <?= $block->getMaxPageCount() === $block->getCurrentPageNumber() ? ' disabled"' :
-                    '" data-url="' . $block->getNextUrl($block->getCurrentPageSize() , $block->getCurrentPageNumber() + 1); ?>">
-                    <span><?= __('Next page'); ?></span>
-                </button>
-            </div>
-        </div>
+        <?= /** @noEscape */ $renderPager($block, 'top', '', true) ?>
         <table class="admin__control-table" data-index="attribute_options_select">
             <thead>
             <tr id="attribute-options-table">
@@ -80,6 +105,7 @@ $stores = $block->getStoresSortedBySortOrder();
             </tr>
             </tfoot>
         </table>
+        <?= /** @noEscape */ $renderPager($block, 'bottom', 'attribute-pager-bottom') ?>
         <input type="hidden" id="option-count-check" value="" />
     </div>
     <script id="row-template" type="text/x-magento-template">
@@ -107,20 +133,11 @@ $stores = $block->getStoresSortedBySortOrder();
         </td>
         </tr>
     </script>
-    <?php
-    $values = [];
-    foreach ($block->getOptionValues() as $value) {
-        $value = $value->getData();
-        $values[] = is_array($value) ? array_map(function ($str) {
-            return htmlspecialchars_decode($str, ENT_QUOTES);
-        }, $value) : $value;
-    }
-    ?>
     <script type="text/x-magento-init">
         {
             "*": {
                 "Magento_Catalog/js/options": {
-                    "attributesData": <?= /* @noEscape */ json_encode($values, JSON_HEX_QUOT) ?>,
+                    "attributesData": <?= /* @noEscape */ json_encode($block->getOptionValuesData(), JSON_HEX_QUOT) ?>,
                     "isSortable":  <?= (int)(!$block->getReadOnly() && !$block->canManageOptionDefaultOnly()) ?>,
                     "isReadOnly": <?= (int)$block->getReadOnly() ?>
                 },
@@ -129,7 +146,14 @@ $stores = $block->getStoresSortedBySortOrder();
                     "message": "<?= $block->escapeHtml(__("The value of Admin must be unique.")) ?>"
                 },
                 "Qoliber_AttributeOptionPager/js/pager": {
-                    "ajaxUrlValue": {}
+                    "ajaxUrl": "<?= $block->escapeUrl($block->getPagerAjaxUrl()) ?>",
+                    "panelId": "manage-options-panel",
+                    "panelType": "options",
+                    "containerSelector": "[data-role=options-container]",
+                    "registryKey": "manage-options-panel",
+                    "filterSelector": ".attribute-pager-filter-input",
+                    "requestParams": <?= /* @noEscape */ json_encode($block->getPagerRequestParams(), JSON_HEX_QUOT) ?>,
+                    "pagination": <?= /* @noEscape */ json_encode($pagination, JSON_HEX_QUOT) ?>
                 }
             }
         }
